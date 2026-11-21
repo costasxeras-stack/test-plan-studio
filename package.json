@@ -1,0 +1,10 @@
+{
+  "name": "test-plan-studio",
+  "version": "0.1.0",
+  "description": "Design, size and read A/B tests, with the decision rule written down before launch.",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 8000"
+  },
+  "license": "MIT"
+}

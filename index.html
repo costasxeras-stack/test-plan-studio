@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Plan Studio · design, size and read A/B tests</title>
+<meta name="description" content="Design an A/B test before you run it: hypothesis, sample size, duration, guardrails and a pre-registration plan. Then read the result with a significance test, confidence interval and sample ratio check.">
+<meta name="theme-color" content="#3949ab">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233949ab'/%3E%3Crect x='7' y='14' width='7' height='11' rx='1.5' fill='white'/%3E%3Crect x='18' y='8' width='7' height='17' rx='1.5' fill='%23ffca28'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,600;7..72,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app.css?v=1">
+<style>
+:root{--accent:#3949ab;--soft:#e8eaf6;--b:#ffb300}
+.intro .kicker{font:600 12.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.lay{display:grid;grid-template-columns:360px 1fr;gap:18px;align-items:start}
+.lay>.card{margin-top:0}
+.side label{display:flex;justify-content:space-between;gap:8px}
+.side label output{color:var(--accent);font-weight:700}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.big{font:700 40px/1 var(--display);color:var(--accent)}
+.verdict{border-radius:14px;padding:14px 16px;margin-top:12px;font-size:15px;border-left:5px solid}
+.verdict.win{background:#e8f5e9;border-color:#2e7d32}.verdict.lose{background:#ffebee;border-color:#c62828}.verdict.flat{background:#f3f1ec;border-color:#8d8478}.verdict.warn{background:#fff8e1;border-color:#ffb300}
+.verdict b.t{display:block;font-size:16.5px;margin-bottom:4px}
+svg text{font:12px var(--body);fill:var(--muted)}
+.ci{position:relative;height:56px;margin-top:10px}
+.checks{display:grid;gap:8px;margin-top:10px}
+.checks div{display:grid;grid-template-columns:24px 1fr;gap:8px;font-size:14.5px}
+.checks i{font-style:normal;font-weight:700;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:13px;color:#fff}
+.ok i{background:#2e7d32}.bad i{background:#c62828}.mid i{background:#ffb300}
+pre.out{white-space:pre-wrap;max-height:520px;overflow:auto}
+.pk{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grp{display:grid;grid-template-columns:110px 1fr 1fr;gap:8px;align-items:end}
+.grp b{font-size:14px;padding-bottom:10px}
+.mini{font-size:12.5px;color:var(--faint)}
+.hyp{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:15.5px;margin-top:10px}
+@media (max-width:900px){.lay{grid-template-columns:1fr}}
+@media (max-width:600px){.pk{grid-template-columns:1fr}.grp{grid-template-columns:80px 1fr 1fr}.big{font-size:34px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./"><i><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="4" height="6" rx="1" fill="white"/><rect x="9" y="3" width="4" height="10" rx="1" fill="#ffca28"/></svg></i>Test Plan Studio</a>
+  <nav><a class="hide-sm" href="https://github.com/costasxeras-stack/test-plan-studio">GitHub</a><a href="https://kostasxeras.com/">Portfolio</a></nav>
+</div></header>
+<div class="tabs" role="tablist" aria-label="Sections"><div class="wrap">
+  <button role="tab" data-view="design" aria-selected="true">1 · Design</button>
+  <button role="tab" data-view="peek" aria-selected="false">2 · Why not peek</button>
+  <button role="tab" data-view="read" aria-selected="false">3 · Read the result</button>
+  <button role="tab" data-view="plan" aria-selected="false">4 · Test plan</button>
+</div></div>
+
+<main class="wrap">
+  <section class="intro">
+    <span class="kicker">A/B test designer</span>
+    <h1>Decide what you will believe before the test starts.</h1>
+    <p>Most bad A/B test decisions are made before launch: no clear hypothesis, too little traffic, no stopping rule. Set the test up here, see how long it really needs, and leave with a written plan. When it ends, read the result with the same rules.</p>
+  </section>
+
+  <!-- DESIGN -->
+  <div data-panel="design">
+    <div class="lay">
+      <section class="card side">
+        <h2>Hypothesis</h2>
+        <label for="h-change">If we</label><input type="text" id="h-change" value="show delivery cost on the product page">
+        <label for="h-who">for</label><input type="text" id="h-who" value="first-time visitors">
+        <label for="h-metric">then this metric will rise</label><input type="text" id="h-metric" value="checkout conversion">
+        <label for="h-why">because</label><input type="text" id="h-why" value="fewer people leave at the shipping step">
+        <h2 style="margin-top:18px">Metric</h2>
+        <div class="seg" role="group" aria-label="Metric type"><button type="button" data-mt="prop" aria-pressed="true">Conversion rate</button><button type="button" data-mt="mean" aria-pressed="false">Average value</button></div>
+        <div id="m-prop"><label for="base">Baseline conversion <output id="o-base"></output></label><input type="number" id="base" min="0.01" max="99" step="0.01" value="3.2"></div>
+        <div id="m-mean" hidden><div class="grid2"><div><label for="mu">Baseline average</label><input type="number" id="mu" value="62" step="0.1"></div><div><label for="sd">Standard deviation</label><input type="number" id="sd" value="48" step="0.1" min="0.01"></div></div></div>
+        <label for="mde">Smallest lift worth detecting (relative) <output id="o-mde"></output></label><input type="range" id="mde" min="1" max="50" step="0.5" value="8">
+        <h2 style="margin-top:18px">Rules</h2>
+        <div class="grid2">
+          <div><label for="alpha">Significance level</label><select id="alpha"><option value="0.01">1%</option><option value="0.05" selected>5%</option><option value="0.10">10%</option></select></div>
+          <div><label for="power">Power</label><select id="power"><option value="0.8" selected>80%</option><option value="0.85">85%</option><option value="0.9">90%</option></select></div>
+        </div>
+        <div class="grid2">
+          <div><label for="sides">Test</label><select id="sides"><option value="2" selected>Two-sided</option><option value="1">One-sided</option></select></div>
+          <div><label for="variants">Variants besides control</label><select id="variants"><option>1</option><option>2</option><option>3</option></select></div>
+        </div>
+        <label for="split">Share of traffic to control <output id="o-split"></output></label><input type="range" id="split" min="10" max="90" step="5" value="50">
+        <label for="traffic">Eligible users a day, all groups</label><input type="number" id="traffic" value="4000" min="1" step="1">
+        <label for="expo">Share of eligible users in the test <output id="o-expo"></output></label><input type="range" id="expo" min="5" max="100" step="5" value="100">
+        <p class="note">Sample inputs to show how it works. Replace them with your own.</p>
+      </section>
+      <div>
+        <section class="card" style="margin-top:0">
+          <div class="hyp" id="hyp"></div>
+          <div class="stats" style="margin-top:14px">
+            <div class="stat"><b id="s-n">–</b><span>users per group</span></div>
+            <div class="stat"><b id="s-tot">–</b><span>users in total</span></div>
+            <div class="stat"><b id="s-days">–</b><span>days to run</span></div>
+            <div class="stat"><b id="s-target">–</b><span>variant at the minimum lift</span></div>
+          </div>
+          <div class="verdict" id="d-verdict"></div>
+        </section>
+        <section class="card">
+          <h2>Duration against the smallest lift</h2>
+          <p class="sub">Smaller lifts need far more users. Each point uses your current traffic and rules. The dot is your setting.</p>
+          <svg id="curve" viewBox="0 0 640 260" role="img" aria-label="Days needed by minimum detectable lift" style="width:100%;height:auto"></svg>
+        </section>
+        <section class="card">
+          <h2>Guardrail metrics</h2>
+          <p class="sub">Metrics that must not get worse. Tick the ones this test should watch, or add your own. They go into the test plan.</p>
+          <div class="chips" id="guards"></div>
+          <div class="row"><input type="text" id="g-new" placeholder="Add a guardrail" style="max-width:280px"><button class="btn small" type="button" id="g-add">Add</button></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- PEEK -->
+  <div data-panel="peek" hidden>
+    <section class="card">
+      <h2>What happens if you check every day and stop at the first significant result</h2>
+      <p class="sub">This runs hundreds of A/A tests in your browser, where both groups get the same experience, so every "winner" is a false alarm. It uses your baseline, traffic and significance level from step 1.</p>
+      <div class="row"><label for="pk-runs" style="margin:0">Simulated tests</label><select id="pk-runs" style="max-width:120px"><option>500</option><option selected>1000</option><option>2000</option></select><label for="pk-days" style="margin:0">Days</label><select id="pk-days" style="max-width:100px"><option>14</option><option selected>28</option><option>42</option></select><button class="btn primary" type="button" id="pk-go">Run simulation</button></div>
+      <div class="pk" style="margin-top:14px">
+        <div class="stat"><b id="pk-fixed">–</b><span>false winners when you look once, at the end</span></div>
+        <div class="stat"><b id="pk-daily">–</b><span>false winners when you check daily and stop early</span></div>
+        <div class="stat"><b id="pk-x">–</b><span>how much more often you fool yourself</span></div>
+      </div>
+      <svg id="pk-chart" viewBox="0 0 640 240" role="img" aria-label="Share of A/A tests declared significant by day" style="width:100%;height:auto;margin-top:12px"></svg>
+      <div class="verdict warn"><b class="t">The rule</b>Decide the sample size first and read the result once, when you reach it. If you must watch early, use a method built for it, such as a sequential test with adjusted thresholds, and write that into the plan. Looking at guardrails daily is fine. Stopping for a winner is not.</div>
+    </section>
+  </div>
+
+  <!-- READ -->
+  <div data-panel="read" hidden>
+    <div class="lay">
+      <section class="card side">
+        <h2>Results</h2>
+        <div class="seg" role="group" aria-label="Result type"><button type="button" data-rt="prop" aria-pressed="true">Conversions</button><button type="button" data-rt="mean" aria-pressed="false">Averages</button></div>
+        <div id="r-prop">
+          <div class="grp"><span></span><span class="mini">Users</span><span class="mini">Converted</span></div>
+          <div class="grp"><b>Control</b><input type="number" id="rc-n" value="25400" min="1"><input type="number" id="rc-x" value="812" min="0"></div>
+          <div class="grp"><b>Variant</b><input type="number" id="rv-n" value="25210" min="1"><input type="number" id="rv-x" value="906" min="0"></div>
+        </div>
+        <div id="r-mean" hidden>
+          <div class="grp" style="grid-template-columns:80px 1fr 1fr 1fr"><span></span><span class="mini">Users</span><span class="mini">Average</span><span class="mini">Std dev</span></div>
+          <div class="grp" style="grid-template-columns:80px 1fr 1fr 1fr"><b>Control</b><input type="number" id="mc-n" value="5000"><input type="number" id="mc-m" value="62" step="0.01"><input type="number" id="mc-s" value="48" step="0.01"></div>
+          <div class="grp" style="grid-template-columns:80px 1fr 1fr 1fr"><b>Variant</b><input type="number" id="mv-n" value="5040"><input type="number" id="mv-m" value="63.9" step="0.01"><input type="number" id="mv-s" value="49" step="0.01"></div>
+        </div>
+        <div class="grid2"><div><label for="r-alpha">Significance level</label><select id="r-alpha"><option value="0.01">1%</option><option value="0.05" selected>5%</option><option value="0.10">10%</option></select></div><div><label for="r-split">Planned control share</label><select id="r-split"><option value="0.5" selected>50%</option><option value="0.3">30%</option><option value="0.2">20%</option><option value="0.1">10%</option></select></div></div>
+        <label for="r-planned">Planned users per group (from step 1)</label><input type="number" id="r-planned" min="0">
+        <p class="note">Sample numbers to show how it works. Replace them with your own.</p>
+      </section>
+      <div>
+        <section class="card" style="margin-top:0">
+          <div class="stats">
+            <div class="stat"><b id="r-c">–</b><span>control</span></div>
+            <div class="stat"><b id="r-v">–</b><span>variant</span></div>
+            <div class="stat"><b id="r-lift">–</b><span>relative lift</span></div>
+            <div class="stat"><b id="r-p">–</b><span>p-value</span></div>
+          </div>
+          <h3 style="font:600 15px var(--body);margin-top:16px">Confidence interval for the difference</h3>
+          <svg id="r-ci" viewBox="0 0 640 90" role="img" aria-label="Confidence interval" style="width:100%;height:auto"></svg>
+          <div class="verdict" id="r-verdict"></div>
+        </section>
+        <section class="card">
+          <h2>Checks before you trust it</h2>
+          <div class="checks" id="r-checks"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div data-panel="plan" hidden>
+    <section class="card">
+      <h2>Test plan</h2>
+      <p class="sub">Written from your inputs in step 1. Copy it into your ticket or doc before launch, so the decision rule is fixed before anyone sees data.</p>
+      <div class="grid2"><div><label for="p-name">Test name</label><input type="text" id="p-name" value="Delivery cost on product page"></div><div><label for="p-owner">Owner</label><input type="text" id="p-owner" placeholder="Your name"></div></div>
+      <label for="p-ship">If it wins, we will</label><input type="text" id="p-ship" value="roll it out to all first-time visitors">
+      <label for="p-lose">If it is flat or loses, we will</label><input type="text" id="p-lose" value="keep the current page and test showing the cost in the cart instead">
+      <div class="row"><button class="btn primary" type="button" id="p-copy">Copy as Markdown</button><button class="btn" type="button" id="p-dl">Download .md</button></div>
+      <pre class="out" id="p-out" style="margin-top:12px"></pre>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>How the numbers are worked out</h2>
+    <ul class="sub" style="padding-left:20px;display:grid;gap:6px">
+      <li>Sample size for conversion rates uses the standard two-proportion formula with unequal allocation (Fleiss). For averages it uses the normal approximation with your standard deviation.</li>
+      <li>With more than one variant, the significance level is split across comparisons (Bonferroni), which is simple and slightly conservative.</li>
+      <li>Duration is rounded up to whole weeks, so weekday and weekend behaviour are both in the sample.</li>
+      <li>Results use a two-proportion z-test (pooled) for the p-value and an unpooled interval for the difference. Averages use a large-sample z-test (Welch standard error).</li>
+      <li>The sample ratio check is a chi-square test against your planned split. A p-value under 0.001 means the split is broken and the result should not be trusted.</li>
+    </ul>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+<footer><div class="wrap"><span>Test Plan Studio v0.1.0 by <a href="https://kostasxeras.com/">Konstantinos Xeras</a>, built with Claude (Anthropic). Everything runs in your browser. <a href="https://github.com/costasxeras-stack/test-plan-studio">Code and decisions on GitHub</a>.</span></div></footer>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); setTimeout(function () { t.classList.remove('on'); }, 1800); }
+
+  function sw(id) { var el = $(id), w = Math.round(Math.max(320, Math.min(640, el.getBoundingClientRect().width || 640))); el.setAttribute('viewBox', '0 0 ' + w + ' ' + el.viewBox.baseVal.height); return w; }
+  // ---------- statistics
+  function phi(x) { // standard normal CDF, Abramowitz-Stegun 7.1.26 via erf
+    var s = x < 0 ? -1 : 1, z = Math.abs(x) / Math.SQRT2, t = 1 / (1 + 0.3275911 * z);
+    var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-z * z);
+    return 0.5 * (1 + s * y);
+  }
+  function qnorm(p) { // Acklam
+    var a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.3577518672690, -30.66479806614716, 2.506628277459239], b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572], c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783], d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416], q, r;
+    if (p < 0.02425) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    if (p > 1 - 0.02425) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    q = p - 0.5; r = q * q; return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  // n for control; variant gets k * n where k = variant share / control share
+  function nProp(p1, p2, alpha, power, sides, k) {
+    var za = qnorm(1 - alpha / sides), zb = qnorm(power), pb = (p1 + k * p2) / (1 + k);
+    var num = za * Math.sqrt(pb * (1 - pb) * (1 + 1 / k)) + zb * Math.sqrt(p1 * (1 - p1) + p2 * (1 - p2) / k);
+    return Math.pow(num, 2) / Math.pow(p2 - p1, 2);
+  }
+  function nMean(sd, delta, alpha, power, sides, k) {
+    var za = qnorm(1 - alpha / sides), zb = qnorm(power);
+    return Math.pow(za + zb, 2) * sd * sd * (1 + 1 / k) / (delta * delta);
+  }
+
+  // ---------- tabs
+  document.querySelector('.tabs').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-view]'); if (!b) return;
+    document.querySelectorAll('.tabs [data-view]').forEach(function (x) { x.setAttribute('aria-selected', x === b); });
+    document.querySelectorAll('[data-panel]').forEach(function (p) { p.hidden = p.getAttribute('data-panel') !== b.getAttribute('data-view'); });
+    if (b.getAttribute('data-view') === 'plan') plan();
+    if (b.getAttribute('data-view') === 'read') read();
+    if (b.getAttribute('data-view') === 'design') curve();
+    if (b.getAttribute('data-view') === 'peek' && !peekDone) peek();
+    window.scrollTo({ top: 0 });
+  });
+
+  // ---------- design
+  var mt = 'prop', D = {};
+  document.querySelector('[data-mt]').parentNode.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mt]'); if (!b) return; mt = b.getAttribute('data-mt');
+    document.querySelectorAll('[data-mt]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+    $('m-prop').hidden = mt !== 'prop'; $('m-mean').hidden = mt !== 'mean'; design();
+  });
+  var GUARDS = ['Page load time', 'Refund or return rate', 'Support contacts per order', 'Average order value', 'Unsubscribe rate', 'Revenue per visitor'];
+  var gOn = { 'Average order value': true, 'Page load time': true };
+  function drawGuards() { $('guards').innerHTML = GUARDS.map(function (g) { return '<button type="button" class="chip" aria-pressed="' + !!gOn[g] + '" data-g="' + esc(g) + '">' + esc(g) + '</button>'; }).join(''); }
+  $('guards').addEventListener('click', function (e) { var b = e.target.closest('[data-g]'); if (!b) return; var g = b.getAttribute('data-g'); gOn[g] = !gOn[g]; drawGuards(); });
+  $('g-add').addEventListener('click', function () { var v = $('g-new').value.trim(); if (!v) return; if (GUARDS.indexOf(v) < 0) GUARDS.push(v); gOn[v] = true; $('g-new').value = ''; drawGuards(); });
+  drawGuards();
+
+  function calc(rel) {
+    var alpha = +$('alpha').value, power = +$('power').value, sides = +$('sides').value, v = +$('variants').value;
+    var share = +$('split').value / 100, k = (1 - share) / v / share, a = alpha / v;
+    var daily = Math.max(1, +$('traffic').value) * (+$('expo').value / 100);
+    var n, target;
+    if (mt === 'prop') { var p1 = Math.max(0.0001, Math.min(0.99, +$('base').value / 100)), p2 = Math.min(0.9999, p1 * (1 + rel)); n = nProp(p1, p2, a, power, sides, k); target = p2; }
+    else { var mu = +$('mu').value, sd = Math.max(0.0001, +$('sd').value); n = nMean(sd, mu * rel, a, power, sides, k); target = mu * (1 + rel); }
+    n = Math.ceil(n); var nv = Math.ceil(n * k), tot = n + nv * v, days = Math.ceil(tot / daily);
+    return { n: n, nv: nv, tot: tot, days: days, weeks: Math.ceil(days / 7), target: target, k: k, a: a, alpha: alpha, power: power, sides: sides, v: v, share: share, daily: daily };
+  }
+  function design() {
+    var rel = +$('mde').value / 100;
+    $('o-mde').textContent = (+$('mde').value).toFixed(1) + '%'; $('o-split').textContent = $('split').value + '% control'; $('o-expo').textContent = $('expo').value + '%';
+    $('o-base').textContent = '';
+    var r = calc(rel); D = r; D.rel = rel;
+    $('hyp').innerHTML = 'If we <b>' + esc($('h-change').value || '…') + '</b> for <b>' + esc($('h-who').value || '…') + '</b>, then <b>' + esc($('h-metric').value || '…') + '</b> will rise by at least <b>' + (rel * 100).toFixed(1) + '%</b>, because ' + esc($('h-why').value || '…') + '.';
+    $('s-n').textContent = r.v === 1 && r.k === 1 ? fmt(r.n) : fmt(r.n) + ' / ' + fmt(r.nv);
+    $('s-n').nextElementSibling.textContent = r.v === 1 && r.k === 1 ? 'users per group' : 'control / each variant';
+    $('s-tot').textContent = fmt(r.tot);
+    $('s-days').textContent = r.days > 999 ? '999+' : fmt(r.days);
+    $('s-days').nextElementSibling.textContent = 'days, so plan ' + r.weeks + ' full week' + (r.weeks === 1 ? '' : 's');
+    $('s-target').textContent = mt === 'prop' ? (r.target * 100).toFixed(2) + '%' : r.target.toFixed(2);
+    var v = $('d-verdict');
+    if (r.days > 56) { v.className = 'verdict lose'; v.innerHTML = '<b class="t">This test is too small for your traffic.</b>It needs ' + r.weeks + ' weeks. Over two months, seasonality, returning users and other launches will muddy the result. Test a bolder change, pick a metric closer to the change, or put more traffic in the test.'; }
+    else if (r.days > 28) { v.className = 'verdict warn'; v.innerHTML = '<b class="t">Possible, but long.</b>' + r.weeks + ' weeks is workable if nothing else ships to the same users. Check whether a bigger minimum lift is still worth acting on.'; }
+    else { v.className = 'verdict win'; v.innerHTML = '<b class="t">Runnable.</b>Plan ' + r.weeks + ' full week' + (r.weeks === 1 ? '' : 's') + ' and do not stop early, even if it looks good on day three. ' + (r.days < 7 ? 'The sample would fill in under a week, but run a full week to cover weekday and weekend behaviour.' : ''); }
+    if (r.v > 1) v.innerHTML += ' With ' + r.v + ' variants, each comparison uses a significance level of ' + (r.a * 100).toFixed(2) + '%.';
+    curve(); $('r-planned').value = r.n;
+  }
+  function curve() {
+    var pts = [], W = sw('curve'), H = 260, L = 48, B = 34, T = 14, R = 14;
+    for (var m = 2; m <= 30; m += 0.5) pts.push([m, Math.min(120, calc(m / 100).days)]);
+    var mx = Math.max(28, Math.min(120, Math.max.apply(null, pts.map(function (p) { return p[1]; }))));
+    var x = function (m) { return L + (m - 2) / 28 * (W - L - R); }, y = function (d) { return H - B - Math.min(d, mx) / mx * (H - B - T); };
+    var g = '';
+    [7, 14, 28, 56, 84, 112].filter(function (d) { return d <= mx; }).forEach(function (d) { g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(d) + '" y2="' + y(d) + '" stroke="#eeebe5"/><text x="' + (L - 6) + '" y="' + (y(d) + 4) + '" text-anchor="end">' + d + 'd</text>'; });
+    [2, 5, 10, 15, 20, 25, 30].forEach(function (m) { g += '<text x="' + x(m) + '" y="' + (H - 12) + '" text-anchor="middle">' + m + '%</text>'; });
+    g += '<rect x="' + L + '" y="' + y(Math.min(mx, 28)) + '" width="' + (W - L - R) + '" height="' + (y(0) - y(Math.min(mx, 28))) + '" fill="#e8f5e9" opacity=".6"/>';
+    g += '<polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="' + pts.map(function (p) { return x(p[0]).toFixed(1) + ',' + y(p[1]).toFixed(1); }).join(' ') + '"/>';
+    var cm = Math.max(2, Math.min(30, D.rel * 100));
+    g += '<circle cx="' + x(cm) + '" cy="' + y(D.days) + '" r="6" fill="#ffb300" stroke="#fff" stroke-width="2"/>';
+    g += '<text x="' + (W - R) + '" y="' + (y(Math.min(mx, 28)) + 16) + '" text-anchor="end" fill="#2e7d32">4 weeks or less</text>';
+    $('curve').innerHTML = g;
+  }
+  ['h-change', 'h-who', 'h-metric', 'h-why', 'base', 'mu', 'sd', 'mde', 'alpha', 'power', 'sides', 'variants', 'split', 'traffic', 'expo'].forEach(function (id) { $(id).addEventListener('input', design); $(id).addEventListener('change', design); });
+  design();
+
+  // ---------- peeking simulation (A/A)
+  var peekDone = false;
+  function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function peek() {
+    peekDone = true;
+    var runs = +$('pk-runs').value, days = +$('pk-days').value, r = rng(42);
+    var p = mt === 'prop' ? Math.max(0.001, Math.min(0.99, +$('base').value / 100)) : 0.05;
+    var perDay = Math.max(20, Math.round(D.daily / 2)), za = qnorm(1 - D.alpha / 2);
+    var gauss = function () { var u = 1 - r(), v = r(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    var draw = function (n) { return Math.max(0, Math.round(n * p + Math.sqrt(n * p * (1 - p)) * gauss())); };
+    var firstHit = new Array(days + 1).fill(0), fixed = 0, early = 0;
+    for (var s = 0; s < runs; s++) {
+      var xa = 0, xb = 0, n = 0, hit = 0;
+      for (var d = 1; d <= days; d++) {
+        xa += draw(perDay); xb += draw(perDay); n += perDay;
+        var pa = xa / n, pb = xb / n, pp = (xa + xb) / (2 * n), se = Math.sqrt(pp * (1 - pp) * 2 / n), z = se > 0 ? (pb - pa) / se : 0;
+        if (!hit && Math.abs(z) > za) { hit = d; }
+        if (d === days && Math.abs(z) > za) fixed++;
+      }
+      if (hit) { early++; firstHit[hit]++; }
+    }
+    var f = fixed / runs, e = early / runs;
+    $('pk-fixed').textContent = (f * 100).toFixed(1) + '%'; $('pk-daily').textContent = (e * 100).toFixed(1) + '%'; $('pk-x').textContent = (e / Math.max(f, 0.001)).toFixed(1) + '×';
+    $('pk-fixed').nextElementSibling.textContent = 'false winners when you look once, at the end (expected about ' + (D.alpha * 100).toFixed(0) + '%)';
+    // cumulative chart
+    var W = sw('pk-chart'), H = 240, L = 44, B = 30, T = 14, R = 14, cum = 0, pts = [], mx = Math.max(0.1, Math.ceil(e * 10 + 0.5) / 10);
+    for (var d2 = 1; d2 <= days; d2++) { cum += firstHit[d2]; pts.push([d2, cum / runs]); }
+    var x = function (d) { return L + (d - 1) / (days - 1) * (W - L - R); }, y = function (v) { return H - B - v / mx * (H - B - T); };
+    var g = '';
+    for (var t = 0; t <= mx + 1e-9; t += 0.1) g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(t) + '" y2="' + y(t) + '" stroke="#eeebe5"/><text x="' + (L - 6) + '" y="' + (y(t) + 4) + '" text-anchor="end">' + Math.round(t * 100) + '%</text>';
+    for (var dd = 7; dd <= days; dd += 7) g += '<text x="' + x(dd) + '" y="' + (H - 10) + '" text-anchor="' + (dd === days ? 'end' : 'middle') + '">day ' + dd + '</text>';
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(D.alpha) + '" y2="' + y(D.alpha) + '" stroke="#2e7d32" stroke-dasharray="5 4" stroke-width="2"/><text x="' + (W - R) + '" y="' + (y(D.alpha) + 16) + '" text-anchor="end" fill="#2e7d32">promised false alarm rate</text>';
+    g += '<polyline fill="none" stroke="#c62828" stroke-width="2.5" points="' + pts.map(function (q) { return x(q[0]).toFixed(1) + ',' + y(q[1]).toFixed(1); }).join(' ') + '"/><text x="' + (W - R) + '" y="' + (y(e) - 8) + '" text-anchor="end" fill="#c62828">stopped at first "win"</text>';
+    $('pk-chart').innerHTML = g;
+  }
+  $('pk-go').addEventListener('click', peek);
+
+  // ---------- read results
+  var rt = 'prop';
+  document.querySelector('[data-rt]').parentNode.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rt]'); if (!b) return; rt = b.getAttribute('data-rt');
+    document.querySelectorAll('[data-rt]').forEach(function (x) { x.setAttribute('aria-pressed', x === b); });
+    $('r-prop').hidden = rt !== 'prop'; $('r-mean').hidden = rt !== 'mean'; read();
+  });
+  function read() {
+    var alpha = +$('r-alpha').value, zc = qnorm(1 - alpha / 2), nc, nv, c, v, diff, se, z, dp = 2, unit;
+    if (rt === 'prop') {
+      nc = Math.max(1, +$('rc-n').value); nv = Math.max(1, +$('rv-n').value);
+      var xc = Math.min(nc, Math.max(0, +$('rc-x').value)), xv = Math.min(nv, Math.max(0, +$('rv-x').value));
+      c = xc / nc; v = xv / nv; diff = v - c; var pp = (xc + xv) / (nc + nv);
+      var sep = Math.sqrt(pp * (1 - pp) * (1 / nc + 1 / nv)); z = sep > 0 ? diff / sep : 0;
+      se = Math.sqrt(c * (1 - c) / nc + v * (1 - v) / nv);
+      $('r-c').textContent = (c * 100).toFixed(2) + '%'; $('r-v').textContent = (v * 100).toFixed(2) + '%'; unit = 'pts'; diff *= 100; se *= 100;
+    } else {
+      nc = Math.max(2, +$('mc-n').value); nv = Math.max(2, +$('mv-n').value); c = +$('mc-m').value; v = +$('mv-m').value;
+      se = Math.sqrt(Math.pow(+$('mc-s').value, 2) / nc + Math.pow(+$('mv-s').value, 2) / nv); diff = v - c; z = se > 0 ? diff / se : 0;
+      $('r-c').textContent = c.toFixed(2); $('r-v').textContent = v.toFixed(2); unit = '';
+    }
+    var p = 2 * (1 - phi(Math.abs(z))), lo = diff - zc * se, hi = diff + zc * se, rel = c !== 0 ? (v - c) / c : 0;
+    $('r-lift').textContent = (rel >= 0 ? '+' : '') + (rel * 100).toFixed(1) + '%';
+    $('r-p').textContent = p < 0.0001 ? '<0.0001' : p.toFixed(4);
+    // CI chart
+    var W = sw('r-ci'), span = Math.max(Math.abs(lo), Math.abs(hi), Math.abs(diff)) * 1.3 || 1, x = function (d) { return W / 2 + d / span * (W / 2 - 40); };
+    var col = lo > 0 ? '#2e7d32' : hi < 0 ? '#c62828' : '#8d8478';
+    $('r-ci').innerHTML = '<line x1="' + x(0) + '" x2="' + x(0) + '" y1="8" y2="62" stroke="#bdb6aa" stroke-dasharray="4 4"/><text x="' + x(0) + '" y="80" text-anchor="middle">no difference</text>' +
+      '<line x1="' + x(lo) + '" x2="' + x(hi) + '" y1="35" y2="35" stroke="' + col + '" stroke-width="10" stroke-linecap="round" opacity=".35"/><circle cx="' + x(diff) + '" cy="35" r="8" fill="' + col + '"/>' +
+      '<text x="' + x(lo) + '" y="20" text-anchor="middle">' + lo.toFixed(dp) + '</text><text x="' + x(hi) + '" y="20" text-anchor="middle">' + hi.toFixed(dp) + '</text>';
+    var lbl = rt === 'prop' ? ' percentage points' : '';
+    var vd = $('r-verdict'), ci = (100 * (1 - alpha)).toFixed(0) + '% interval: ' + lo.toFixed(dp) + ' to ' + hi.toFixed(dp) + lbl + '.';
+    if (lo > 0) { vd.className = 'verdict win'; vd.innerHTML = '<b class="t">The variant wins.</b>The difference is ' + (diff >= 0 ? '+' : '') + diff.toFixed(dp) + lbl + ' with a p-value of ' + $('r-p').textContent + '. ' + ci + ' Even the low end is above zero. Check the guardrails and the checks below before you ship.'; }
+    else if (hi < 0) { vd.className = 'verdict lose'; vd.innerHTML = '<b class="t">The variant loses.</b>The difference is ' + diff.toFixed(dp) + lbl + '. ' + ci + ' Even the best case is below zero. Do not ship it.'; }
+    else { vd.className = 'verdict flat'; vd.innerHTML = '<b class="t">No clear difference.</b>' + ci + ' The interval includes zero, so the data fits a small win, no change, or a small loss. "Not significant" does not mean "no effect". If the whole interval is smaller than a change worth acting on, call it flat and move on.'; }
+    // checks
+    var share = +$('r-split').value, tot = nc + nv, ec = tot * share, ev = tot * (1 - share), chi = Math.pow(nc - ec, 2) / ec + Math.pow(nv - ev, 2) / ev, srmP = 2 * (1 - phi(Math.sqrt(chi)));
+    var planned = +$('r-planned').value || 0, minN = Math.min(nc, nv / ((1 - share) / share));
+    var C = [];
+    C.push(srmP < 0.001 ? ['bad', '!', 'Sample ratio mismatch. You planned ' + Math.round(share * 100) + '% control but got ' + (nc / tot * 100).toFixed(1) + '% (p = ' + srmP.toExponential(1) + '). Something in assignment or logging is broken. Fix it before reading the result.'] : ['ok', '✓', 'Split matches the plan: ' + (nc / tot * 100).toFixed(1) + '% control against ' + Math.round(share * 100) + '% planned (sample ratio check p = ' + srmP.toFixed(3) + ').']);
+    if (planned > 0) C.push(nc >= planned ? ['ok', '✓', 'Planned sample reached: ' + fmt(nc) + ' control users against ' + fmt(planned) + ' planned.'] : ['bad', '!', 'Only ' + fmt(nc) + ' of ' + fmt(planned) + ' planned control users (' + Math.round(nc / planned * 100) + '%). Reading now is peeking. Wait for the full sample.']);
+    C.push(['mid', '?', 'Did the test run for whole weeks? If it ran 10 days, weekdays are overweighted.']);
+    C.push(['mid', '?', 'Are the guardrails flat or better? A win on the main metric with a worse guardrail is a trade-off, not a win.']);
+    if (rt === 'prop' && Math.min(c * nc, v * nv) < 100) C.push(['mid', '!', 'Fewer than 100 conversions in a group. The result is fragile even if significant.']);
+    if (Math.abs(rel) > 0.3) C.push(['mid', '!', 'A lift above 30% is rare. Check for tracking errors or a novelty effect before you celebrate.']);
+    $('r-checks').innerHTML = C.map(function (x) { return '<div class="' + x[0] + '"><i>' + x[1] + '</i><span>' + x[2] + '</span></div>'; }).join('');
+  }
+  ['rc-n', 'rc-x', 'rv-n', 'rv-x', 'mc-n', 'mc-m', 'mc-s', 'mv-n', 'mv-m', 'mv-s', 'r-alpha', 'r-split', 'r-planned'].forEach(function (id) { $(id).addEventListener('input', read); $(id).addEventListener('change', read); });
+  read();
+
+  // ---------- plan
+  function plan() {
+    var r = D, metric = $('h-metric').value || 'the primary metric', guards = GUARDS.filter(function (g) { return gOn[g]; });
+    var md = '# Test plan: ' + ($('p-name').value || 'Untitled test') + '\n\n' +
+      'Owner: ' + ($('p-owner').value || '[owner]') + '  \nWritten: ' + new Date().toISOString().slice(0, 10) + ', before launch\n\n' +
+      '## Hypothesis\n\nIf we ' + $('h-change').value + ' for ' + $('h-who').value + ', then ' + metric + ' will rise by at least ' + (r.rel * 100).toFixed(1) + '% (relative), because ' + $('h-why').value + '.\n\n' +
+      '## Primary metric\n\n' + metric.charAt(0).toUpperCase() + metric.slice(1) + '. Baseline: ' + (mt === 'prop' ? $('base').value + '%' : $('mu').value + ' (standard deviation ' + $('sd').value + ')') + '. Minimum lift worth detecting: ' + (r.rel * 100).toFixed(1) + '% relative, so the variant must reach about ' + (mt === 'prop' ? (r.target * 100).toFixed(2) + '%' : r.target.toFixed(2)) + '.\n\n' +
+      '## Design\n\n- Groups: control and ' + r.v + ' variant' + (r.v > 1 ? 's' : '') + ', ' + Math.round(r.share * 100) + '% of traffic to control\n- Significance level: ' + (r.alpha * 100) + '%' + (r.v > 1 ? ' overall, ' + (r.a * 100).toFixed(2) + '% per comparison (Bonferroni)' : '') + ', ' + (r.sides === 2 ? 'two-sided' : 'one-sided') + '\n- Power: ' + Math.round(r.power * 100) + '%\n- Sample: ' + fmt(r.n) + ' control users' + (r.k !== 1 || r.v > 1 ? ' and ' + fmt(r.nv) + ' per variant' : ' and ' + fmt(r.nv) + ' variant users') + ', ' + fmt(r.tot) + ' in total\n- Traffic: ' + fmt(r.daily) + ' eligible users a day in the test\n- Duration: ' + r.weeks + ' full week' + (r.weeks === 1 ? '' : 's') + ' (' + r.days + ' days needed to fill the sample)\n\n' +
+      '## Guardrails\n\n' + (guards.length ? guards.map(function (g) { return '- ' + g + ': must not get worse beyond [threshold]'; }).join('\n') : '- [add guardrails]') + '\n\n' +
+      '## Decision rule\n\n- Read the result once, after ' + r.weeks + ' full week' + (r.weeks === 1 ? '' : 's') + ' and the full sample. No early stopping for a winner.\n- Check the sample ratio first. If it fails (p < 0.001), fix the setup and rerun.\n- Win: the ' + Math.round((1 - r.alpha) * 100) + '% interval for the difference is above zero and no guardrail is worse. Then we will ' + $('p-ship').value + '.\n- Flat or loss: we will ' + $('p-lose').value + '.\n- Stop early only if a guardrail breaks badly, for example errors or a large drop in revenue.\n\n' +
+      '## Risks\n\n- Novelty effect: watch whether the lift fades over the weeks\n- Other launches to the same users during the test\n- [add risks]\n';
+    $('p-out').textContent = md; return md;
+  }
+  ['p-name', 'p-owner', 'p-ship', 'p-lose'].forEach(function (id) { $(id).addEventListener('input', plan); });
+  $('p-copy').addEventListener('click', function () { var md = plan(); (navigator.clipboard ? navigator.clipboard.writeText(md) : Promise.reject()).then(function () { toast('Copied'); }, function () { toast('Select the text and copy it'); }); });
+  $('p-dl').addEventListener('click', function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([plan()], { type: 'text/markdown' })); a.download = ($('p-name').value || 'test-plan').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.md'; a.click(); });
+})();
+</script>
+</body>
+</html>
