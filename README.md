@@ -62,9 +62,9 @@ No usage data yet. These are the measures I would track, with targets to set aft
 2. Add a variance reduction estimate (CUPED) using pre-period data
 3. Save plans in the browser and compare the plan with the result automatically
 
-## How it was built
+## My role
 
-I framed the problem, made the product calls and wrote the conclusions. Claude (Anthropic) was my engineering partner for the code. 
+I framed the problem, made the product calls and wrote the conclusions. 
 
 ## Run it yourself
 
